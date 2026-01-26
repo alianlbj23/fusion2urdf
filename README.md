@@ -5,6 +5,10 @@ This repo only supports Gazebo, if you are using pybullet, see: https://github.c
 
 
 ## Updated!!!
+* 2026/01/27: Fix export directory creation
+  * Automatically creates the full output directory path to avoid first-run FileNotFoundError
+  * Avoids duplicating the {robot_name}_description folder when the user selects it directly
+
 * 2026/01/26: Added Automatic Cleanup Feature
   * Added automatic cleanup of copied components to prevent leaving unnecessary parts in the original Fusion file
   * Users can choose whether to automatically clean up copied components after URDF generation  

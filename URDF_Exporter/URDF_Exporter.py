@@ -57,9 +57,13 @@ def run(context):
         )
         cleanup_components = (cleanup_result == adsk.core.DialogResults.DialogYes)
         
-        save_dir = save_dir + '/' + package_name
-        try: os.mkdir(save_dir)
-        except: pass     
+        # If user selected an existing package folder, do not append again
+        if os.path.basename(save_dir) != package_name:
+            save_dir = save_dir + '/' + package_name
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+        except:
+            pass
 
         package_dir = os.path.abspath(os.path.dirname(__file__)) + '/package/'
         
