@@ -37,7 +37,16 @@ This repo only supports Gazebo, if you are using pybullet, see: https://github.c
 
 ## Installation
 
-### Method 1: Automatic install scripts (recommended)
+### Method 1: Cross-platform Python installer (recommended)
+
+```bash
+cd <path to fusion2urdf>
+python install.py
+```
+
+Use `python install.py --force` to overwrite an existing installation without prompting.
+
+### Method 2: Automatic install scripts (platform-specific)
 
 #### Windows PowerShell (recommended)
 ```powershell
@@ -51,7 +60,7 @@ cd <path to fusion2urdf>
 install.bat
 ```
 
-### Method 2: Manual installation
+### Method 3: Manual installation
 
 Run the following command in your shell.
 
