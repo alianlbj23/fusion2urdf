@@ -7,7 +7,8 @@ This repo only supports Gazebo, if you are using pybullet, see: https://github.c
 ## Updated!!!
 * 2026/01/31: Unity URDF export and Restore design history position
   * Export now includes a URDF format that can be directly imported by the Unity package: https://github.com/Unity-Technologies/URDF-Importer
-  * Records the timeline position on start and restores it after export to return the Fusion design to its initial state
+  * ❗ Records the timeline position on start and restores it after export to return the Fusion design to its initial state
+  * ❗ Even though the script restores the timeline, Fusion may still prompt to save on close because STL export adds history items that are then undone. You can choose to save or not; the design returns to the original timeline position either way.
 
 * 2026/01/27: Fix export directory creation
   * Automatically creates the full output directory path to avoid first-run FileNotFoundError
