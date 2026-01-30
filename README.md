@@ -11,11 +11,11 @@ This repo only supports Gazebo, if you are using pybullet, see: https://github.c
 
 * 2026/01/26: Added Automatic Cleanup Feature
   * Added automatic cleanup of copied components to prevent leaving unnecessary parts in the original Fusion file
-  * Users can choose whether to automatically clean up copied components after URDF generation  
+  * Users can choose whether to automatically clean up copied components after URDF generation
   * Added standalone cleanup tool script for manually cleaning existing copied components
 
-* 2021/01/09: Fix xyz calculation. 
-  * If you see that your components move arround the map center in rviz try this update 
+* 2021/01/09: Fix xyz calculation.
+  * If you see that your components move arround the map center in rviz try this update
   * More Infos see: https://forums.autodesk.com/t5/fusion-360-api-and-scripts/difference-of-geometryororiginone-and-geometryororiginonetwo/m-p/9837767
 
 * 2020/11/10: README fix
@@ -31,7 +31,7 @@ This repo only supports Gazebo, if you are using pybullet, see: https://github.c
   * changed fusion2urdf output from urdf to xacro for more flexibility
   * separate out material, transmissions, gazebo elements to separate files
 * 2018/20/10: Fixed functions to generate launch files
-* 2018/25/09: Supports joint types "Rigid", "Slider" & Supports the joints' limit(for "Revolute" and "Slider"). 
+* 2018/25/09: Supports joint types "Rigid", "Slider" & Supports the joints' limit(for "Revolute" and "Slider").
 * 2018/19/09: Fixed the bugs about the center of the mass and the inertia.
 
 
@@ -98,10 +98,10 @@ This exports:
 * .launch and .yaml files to simulate your robot on gazebo
 * .stl files of your model
 
-### Sample 
+### Sample
 
 The following test model doesn't stand upright because the z axis is not upright in default fusion 360.
-Make sure z axis is upright in your fusion 360 model if you want. 
+Make sure z axis is upright in your fusion 360 model if you want.
 
 #### original model
 <img src="https://github.com/syuntoku14/fusion2urdf/blob/images/industrial_robot.png" alt="industrial_robot" title="industrial_robot" width="300" height="300">
@@ -119,7 +119,7 @@ Make sure z axis is upright in your fusion 360 model if you want.
 
 ## Before using this script
 
-Before using this script, make sure that your model has all the "links" as components. You have to define the links by creating corresiponding components. For example, this model(https://grabcad.com/library/spotmini-robot-1) is not supported unless you define the "base_link". 
+Before using this script, make sure that your model has all the "links" as components. You have to define the links by creating corresiponding components. For example, this model(https://grabcad.com/library/spotmini-robot-1) is not supported unless you define the "base_link".
 
 In addition to that, you should be careful when define your joints. The **parent links** should be set as **Component2** when you define the joint, not as Component1. For example, if you define the "base_link" as Component1 when you define the joints, an error saying "KeyError: base_link__1" will show up.
 
@@ -151,11 +151,11 @@ As you can see below, when fusion initailly forms joints, it might not align whe
 
 ![image](https://user-images.githubusercontent.com/37873142/133145309-298f17a4-bd62-48fa-b1c2-54f58e26fce4.png)
 
-If you were to manually drag the parts and align them as shown below, it would cause cascading problems with the visual and collision properties of certain links. 
+If you were to manually drag the parts and align them as shown below, it would cause cascading problems with the visual and collision properties of certain links.
 
 ![Capture](https://user-images.githubusercontent.com/37873142/133146628-c4c2b8dd-ac7b-41e8-bd62-1d2c2b80adce.PNG)
 
-Below you can see one of the cylinders is mismatched as compared to the others (red and grey colors are cylinders) 
+Below you can see one of the cylinders is mismatched as compared to the others (red and grey colors are cylinders)
 (The below urdf is visualized in pybullet)
 
 ![image](https://user-images.githubusercontent.com/37873142/133141659-440a0a4a-1afa-4751-99ba-fc3db02f7450.png)
@@ -185,13 +185,13 @@ For preplanning the component placement when working/assembling your own robot. 
 As an example, I'll export a urdf file from this cool fusion360 robot-arm model(https://grabcad.com/library/industrial-robot-10).
 This was created by [sanket patil](https://grabcad.com/sanket.patil-16)
 
-### Install in Shell 
+### Install in Shell
 
 Run the [installation command](#installation) in your shell.
 
 ### Run in Fusion 360
 
-Click ADD-INS in fusion 360, then choose ****fusion2urdf****. 
+Click ADD-INS in fusion 360, then choose ****fusion2urdf****.
 
 **This script will change your model. So before running it, copy your model to backup.**
 
@@ -202,17 +202,17 @@ Maybe some error will occur when you run the script. Fix them according to the i
 
 ![error](https://github.com/syuntoku14/fusion2urdf/blob/images/error.png)
 
-**You must define the base component**. Rename the base component as "base_link". 
+**You must define the base component**. Rename the base component as "base_link".
 
 <img src="https://github.com/syuntoku14/fusion2urdf/blob/images/cautions.PNG" alt="cautions" title="cautions" width="300" height="300">
 
-In the above image, base_link is grounded. Right-click it and click "Unground". 
+In the above image, base_link is grounded. Right-click it and click "Unground".
 
-Now you can run the script. Let's run the script. Choose the folder to save and wait for a few seconds. You will see many "old_components" in the components field, please ignore them. 
+Now you can run the script. Let's run the script. Choose the folder to save and wait for a few seconds. You will see many "old_components" in the components field, please ignore them.
 
 <img src="https://github.com/syuntoku14/fusion2urdf/blob/images/result.PNG" alt="results" title="results" width="250" height="300">
 
-You have successfully exported the urdf file. Also, you got `.stl` files in the "Desktop/test/mm_stl" repository. This will be required at the next step. The existing fusion CAD file is no more needed. You can delete it. 
+You have successfully exported the urdf file. Also, you got `.stl` files in the "Desktop/test/mm_stl" repository. This will be required at the next step. The existing fusion CAD file is no more needed. You can delete it.
 
 The folder "Desktop/test" will be required in the next step. Move them into your ros environment.
 
@@ -275,3 +275,7 @@ fusion2urdf now provides an automatic cleanup option that removes duplicated com
 - The cleanup removes components whose names include certain keywords (e.g., 'copy', 'temp_', 'duplicate').
 - It restores original component names that were renamed to 'old_component'.
 - Cleanup includes error handling; failures do not affect URDF generation.
+
+## Attribution
+
+The script [URDF_Exporter/utils/xacro2unity.py](URDF_Exporter/utils/xacro2unity.py) is adapted with reference to https://github.com/doctorsrn/xacro2urdf.
