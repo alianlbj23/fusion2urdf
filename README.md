@@ -5,8 +5,10 @@ This repo only supports Gazebo, if you are using pybullet, see: https://github.c
 
 
 ## Updated!!!
-* 2026/01/31: Unity URDF export
+* 2026/01/31: Unity URDF export and Restore design history position
   * Export now includes a URDF format that can be directly imported by the Unity package: https://github.com/Unity-Technologies/URDF-Importer
+  * Records the timeline position on start and restores it after export to return the Fusion design to its initial state
+
 * 2026/01/27: Fix export directory creation
   * Automatically creates the full output directory path to avoid first-run FileNotFoundError
   * Avoids duplicating the {robot_name}_description folder when the user selects it directly
