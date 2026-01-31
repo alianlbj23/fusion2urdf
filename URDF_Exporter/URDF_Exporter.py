@@ -1,5 +1,20 @@
 # Author-syuntoku14
 # Description-Generate URDF file from Fusion 360
+#
+# Requirement:
+# - If ANY error happens (including early-return), rollback to the very beginning state
+#   and DELETE all history (timeline items) created after the script started.
+#
+# Key point:
+# - Fusion often cannot delete suppressed timeline items while the timeline marker is not at the end.
+# - Therefore, on failure we:
+#   (1) Move marker to END (make timeline items deletable)
+#   (2) Delete items with index >= start_timeline_count (truncate)
+#   (3) Move marker to END again (optional, stabilize UI)
+#
+# NOTE:
+# - This works only when "Design History" is enabled (Parametric modeling).
+# - If the design is in Direct Modeling mode, timeline deletion is not available.
 
 import adsk
 import adsk.core
@@ -14,65 +29,17 @@ from .utils.xacro2unity import convert_xacro_to_urdf
 from .core import Link, Joint, Write
 
 # -----------------------------
-# Undo / rollback (GLOBAL)
+# Rollback / Truncate (GLOBAL)
 # -----------------------------
-_UNDO_EVENT_ID = 'fusion2urdf_do_undo'
-_undo_event = None
-_undo_handler = None
-
-# Used by fallback cleanup when undo/rollback fails
-_undo_root = None
-
-# Rollback control
 _start_marker_index = None
+_start_timeline_count = None
 _need_rollback = False
 
 
-class UndoEventHandler(adsk.core.CustomEventHandler):
-    def notify(self, args):
-        """
-        Fallback undo behavior:
-        1) Try text-command undo (works in most builds)
-        2) If that fails, attempt legacy undo command
-        3) If undo fails, cleanup copied components (best effort)
-        """
-        app = adsk.core.Application.get()
-        try:
-            app.executeTextCommand('NuCommands.UndoCmd')
-            return
-        except:
-            try:
-                app.executeTextCommand('Commands.Start UndoCommand')
-                return
-            except:
-                pass
-
-        # Final fallback: cleanup copied components if undo fails
-        try:
-            global _undo_root
-            if _undo_root is not None:
-                utils.cleanup_copied_components(_undo_root)
-        except:
-            pass
-
-
-def ensure_undo_event():
-    """
-    Register a custom event to execute undo at the very end of the script if needed.
-    """
-    global _undo_event, _undo_handler
-    app = adsk.core.Application.get()
-
-    if _undo_event is None:
-        _undo_event = app.registerCustomEvent(_UNDO_EVENT_ID)
-        _undo_handler = UndoEventHandler()
-        _undo_event.add(_undo_handler)
-
-
-def _get_timeline_marker_index(design: adsk.fusion.Design) -> int:
+def _get_timeline_marker_index(design: adsk.fusion.Design):
     """
     Record the current timeline marker position index.
-    Different Fusion builds expose markerPosition differently, so we try several options.
+    Fusion exposes markerPosition differently by version, so try multiple approaches.
     """
     try:
         tl = design.timeline
@@ -87,7 +54,7 @@ def _get_timeline_marker_index(design: adsk.fusion.Design) -> int:
     except:
         pass
 
-    # Fallback: use the current timeline end as an approximate anchor
+    # Fallback: approximate using current timeline end
     try:
         return int(tl.count)
     except:
@@ -96,7 +63,7 @@ def _get_timeline_marker_index(design: adsk.fusion.Design) -> int:
 
 def _try_set_timeline_marker(design: adsk.fusion.Design, marker_index: int) -> bool:
     """
-    Try to move timeline marker back to a given index.
+    Try to move timeline marker to marker_index.
     Returns True if success, False otherwise.
     """
     if marker_index is None:
@@ -107,7 +74,7 @@ def _try_set_timeline_marker(design: adsk.fusion.Design, marker_index: int) -> b
     except:
         return False
 
-    # Bound marker_index to valid range
+    # Clamp index
     try:
         count = int(tl.count)
         if marker_index < 0:
@@ -134,32 +101,78 @@ def _try_set_timeline_marker(design: adsk.fusion.Design, marker_index: int) -> b
     return False
 
 
-def _rollback_to_start(app: adsk.core.Application, design: adsk.fusion.Design, marker_index: int) -> bool:
+def _move_marker_to_end(design: adsk.fusion.Design):
     """
-    Best-effort rollback to the state at the start of run():
-    1) Try timeline marker rollback (cleanest)
-    2) If not available, try repeated Undo (less deterministic)
-    Returns True if we believe rollback succeeded.
+    Move timeline marker to the end. Needed to ensure timeline items are deletable.
     """
-    # 1) Timeline rollback
-    if _try_set_timeline_marker(design, marker_index):
-        return True
+    tl = design.timeline
+    c = int(tl.count)
+    if c <= 0:
+        return
 
-    # 2) Undo fallback (bounded)
-    # NOTE: This may undo beyond script changes depending on the user's prior state.
-    # We cap the loop to avoid infinite undo.
-    for _ in range(200):
+    # Try to set marker to the last item (most compatible)
+    try:
+        tl.markerPosition = tl.item(c - 1)
+        return
+    except:
+        pass
+
+    # Fallback: set to count
+    try:
+        tl.markerPosition = c
+    except:
+        pass
+
+
+def _delete_timeline_from_index_strict(design: adsk.fusion.Design, start_count: int):
+    """
+    Delete timeline items with index >= start_count.
+
+    In some Fusion builds, timeline.item(i) returns TimelineObject without deleteMe().
+    We must delete its underlying entity/object instead.
+    """
+    if start_count is None:
+        return
+
+    tl = design.timeline
+    end_index = int(tl.count) - 1
+    if end_index < start_count:
+        return
+
+    for i in range(end_index, start_count - 1, -1):
+        tlo = tl.item(i)
+
+        # Try common underlying object access patterns
+        deleted = False
+
+        # 1) entity.deleteMe()
         try:
-            app.executeTextCommand('NuCommands.UndoCmd')
-            return True
+            ent = getattr(tlo, 'entity', None)
+            if ent is not None and hasattr(ent, 'deleteMe'):
+                ent.deleteMe()
+                deleted = True
         except:
-            try:
-                app.executeTextCommand('Commands.Start UndoCommand')
-                return True
-            except:
-                pass
+            pass
 
-    return False
+        if deleted:
+            continue
+
+        # 2) object.deleteMe()
+        try:
+            obj = getattr(tlo, 'object', None)
+            if obj is not None and hasattr(obj, 'deleteMe'):
+                obj.deleteMe()
+                deleted = True
+        except:
+            pass
+
+        if deleted:
+            continue
+
+        # 3) If neither is deletable, try to suppress / remove via timeline itself (rare support)
+        # Some builds support deleting by manipulating timeline groups; not always available.
+        # If not possible, we skip.
+        # (You can log here if you want to know which item cannot be deleted.)
 
 
 # -----------------------------
@@ -176,13 +189,10 @@ def run(context):
     success_msg = 'Successfully create URDF file'
     msg = success_msg
 
-    # Ensure undo event exists (used only as fallback)
-    ensure_undo_event()
-
-    # Default behavior: rollback unless we explicitly mark success
-    global _need_rollback, _start_marker_index
+    global _need_rollback, _start_marker_index, _start_timeline_count
     _need_rollback = True
     _start_marker_index = None
+    _start_timeline_count = None
 
     try:
         # --------------------
@@ -201,12 +211,12 @@ def run(context):
         root = design.rootComponent
         components = design.allComponents
 
-        # Share root for fallback cleanup
-        global _undo_root
-        _undo_root = root
-
-        # Record the "start state" marker before doing anything that may modify the design
+        # Capture "start state" BEFORE any modification
         _start_marker_index = _get_timeline_marker_index(design)
+        try:
+            _start_timeline_count = int(design.timeline.count)
+        except:
+            _start_timeline_count = None
 
         # --------------------
         # naming
@@ -297,7 +307,7 @@ def run(context):
             shutil.copytree(src_meshes, dst_meshes, dirs_exist_ok=True)
 
         # --------------------
-        # cleanup copied components (design may still be rolled back later if failure occurs after this point)
+        # cleanup copied components
         if cleanup_components:
             utils.cleanup_copied_components(root)
             msg += '\nCopied components cleaned up.'
@@ -306,31 +316,52 @@ def run(context):
         if ui:
             ui.messageBox(msg, title)
 
-        # If we reached here, we consider the run successful, so do not rollback
+        # Success: do NOT rollback or delete history
         _need_rollback = False
 
     except:
         if ui:
             ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
         # Keep _need_rollback = True so we rollback in finally
+
     finally:
         # --------------------
-        # FINAL STEP: restore Fusion state on any error or early-return (unless marked success)
+        # On ANY failure or early-return -> rollback and truncate timeline
         try:
             if app is None:
                 app = adsk.core.Application.get()
 
-            # Only rollback if this run did not complete successfully
-            if _need_rollback and design is not None and _start_marker_index is not None:
-                rolled_back = _rollback_to_start(app, design, _start_marker_index)
+            if _need_rollback and design is not None:
+                # Move marker to end first (make items deletable)
+                try:
+                    _move_marker_to_end(design)
+                except:
+                    pass
 
-                # If rollback fails, fallback to custom undo event (best effort)
-                if not rolled_back:
-                    app.fireCustomEvent(_UNDO_EVENT_ID)
+                # Delete all timeline items created after the script started (truncate)
+                try:
+                    if _start_timeline_count is not None:
+                        _delete_timeline_from_index_strict(design, _start_timeline_count)
+                except:
+                    if ui:
+                        ui.messageBox(
+                            'Failed to delete timeline items:\n{}'.format(traceback.format_exc()),
+                            'Fusion2URDF'
+                        )
 
-            # If marker is unavailable, still try the fallback undo event on failure
-            elif _need_rollback:
-                app.fireCustomEvent(_UNDO_EVENT_ID)
+                # Optional: move marker to end again (end is now truncated)
+                try:
+                    _move_marker_to_end(design)
+                except:
+                    pass
+
+                # Optional: also move marker back to the original start marker for "start state" viewing
+                # If you prefer to visually show the start state, uncomment below:
+                # try:
+                #     if _start_marker_index is not None:
+                #         _try_set_timeline_marker(design, _start_marker_index)
+                # except:
+                #     pass
 
             try:
                 adsk.doEvents()
