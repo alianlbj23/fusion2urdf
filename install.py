@@ -49,14 +49,19 @@ def main() -> int:
     target_base = args.target or get_default_target_base()
     target_dir = target_base / "URDF_Exporter"
 
-    if not target_base.exists():
-        print("Error: Fusion 360 API Scripts directory not found.")
+    if target_base.exists() and not target_base.is_dir():
+        print("Error: target path exists but is not a directory.")
         print(f"Path: {target_base}")
         return 1
 
     if target_dir.exists():
         if not args.force:
-            resp = input("Detected an existing URDF_Exporter. Remove and reinstall? (y/N): ").strip().lower()
+            try:
+                resp = input("Detected an existing URDF_Exporter. Remove and reinstall? (y/N): ").strip().lower()
+            except EOFError:
+                print("Installation canceled: no interactive input available.")
+                print("Re-run with --force to overwrite the existing installation.")
+                return 1
             if resp != "y":
                 print("Installation canceled.")
                 return 0
@@ -71,7 +76,7 @@ def main() -> int:
         print("Installing URDF_Exporter...")
         target_dir.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
-        print("✓ URDF_Exporter installation complete!")
+        print("URDF_Exporter installation complete!")
         print(f"Source: {source_dir}")
         print(f"Target: {target_dir}")
         print("\nUsage:")
@@ -80,7 +85,7 @@ def main() -> int:
         print("3. Select URDF_Exporter and run")
         print("4. Choose automatic cleanup to keep files tidy")
     except Exception as exc:  # noqa: BLE001
-        print(f"✗ Installation failed: {exc}")
+        print(f"Installation failed: {exc}")
         return 1
 
     print("\nInstallation complete! Restart Fusion 360 to load the new version.")
